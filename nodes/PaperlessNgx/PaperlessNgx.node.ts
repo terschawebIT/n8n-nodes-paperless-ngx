@@ -747,19 +747,6 @@ export class PaperlessNgx implements INodeType {
 							params.ordering = ordering;
 						}
 						
-						// API-Anfrage senden
-						const responseData = await this.helpers.requestWithAuthentication.call(
-							this,
-							'paperlessNgxApi',
-							{
-								method: 'GET',
-								uri: `${credentials.domain}/api/documents/`,
-								qs: params,
-							},
-							undefined,
-							itemIndex,
-						);
-
 						// Dynamischen Filter aus den Nutzerparametern lesen
 						const extractFilterParams = (params: IDataObject) => {
 							// Extrahiere alle Filter, die mit "__id__in" enden (für Tags, Korrespondenten, etc.)
@@ -775,81 +762,56 @@ export class PaperlessNgx implements INodeType {
 						};
 
 						const filterParams = extractFilterParams(params); // params aus der Anfrage
+						
+						console.log('API-Anfrage Parameter:', JSON.stringify(params));
+						
+						// API-Anfrage senden
+						const responseData = await this.helpers.requestWithAuthentication.call(
+							this,
+							'paperlessNgxApi',
+							{
+								method: 'GET',
+								uri: `${credentials.domain}/api/documents/`,
+								qs: params,
+								json: true,
+							},
+							undefined,
+							itemIndex,
+						);
+						
+						console.log('API-Antwort erhalten:', JSON.stringify(responseData).substring(0, 300) + '...');
 
 						// Wenn ein Filterergebnis mit Ergebnissen zurückkommt
 						if (responseData && responseData.results && Array.isArray(responseData.results)) {
-							let filteredResults = responseData.results;
+							console.log(`Anzahl der Ergebnisse von API: ${responseData.results.length}`);
 							
-							// Für jeden Filter (tags, correspondent, document_type, etc.)
-							for (const [field, ids] of Object.entries(filterParams)) {
-								// Wende den Filter auf die Ergebnisse an
-								filteredResults = filteredResults.filter((doc: IDataObject) => {
-									// Für Felder mit einzelner ID (correspondent_id, document_type_id)
-									if (field.endsWith('_id')) {
-										return ids.includes(doc[field] as number);
-									}
-									// Für Array-Felder wie "tags"
-									else if (Array.isArray(doc[field])) {
-										// Prüfe, ob mindestens eine ID übereinstimmt
-										return ids.some((id: number) => (doc[field] as number[]).includes(id));
-									}
-									return false;
-								});
-							}
-							
-							if (filteredResults.length > 0) {
-								returnData.push(...filteredResults.map((result: IDataObject) => ({ json: result })));
+							// Für Array-Felder wird die Filterung bereits vom Server durchgeführt
+							// Wir müssen nicht nochmal manuell filtern
+							if (responseData.results.length > 0) {
+								returnData.push(...responseData.results.map((result: IDataObject) => ({ json: result })));
+								console.log(`${responseData.results.length} Ergebnisse zurückgegeben`);
 							} else {
 								// Erstelle eine benutzerfreundliche Nachricht mit den verwendeten Filtern
 								const filterDescriptions = Object.entries(filterParams)
 									.map(([field, ids]) => `${field} (IDs: ${ids.join(', ')})`)
 									.join(', ');
 								
+								console.log(`Keine Ergebnisse gefunden für Filter: ${filterDescriptions}`);
 								returnData.push({ json: { 
 									message: `Keine Dokumente mit den angegebenen Filtern gefunden: ${filterDescriptions}`,
-									appliedFilters: filterParams
+									appliedFilters: filterParams,
+									originalParams: params
 								} });
 							}
-						} 
-						// Wenn die API eine Fehlermeldung zurückgibt
-						else if (responseData && responseData.message === "Keine Ergebnisse gefunden" && responseData.rawResponse) {
-							try {
-								// Versuche, die Rohdaten zu parsen
-								const parsedData = typeof responseData.rawResponse === 'string' 
-									? JSON.parse(responseData.rawResponse) 
-									: responseData.rawResponse;
-								
-								if (parsedData.results && Array.isArray(parsedData.results)) {
-									let filteredResults = parsedData.results;
-									
-									// Wende die gleiche Filterlogik an
-									for (const [field, ids] of Object.entries(filterParams)) {
-										filteredResults = filteredResults.filter((doc: IDataObject) => {
-											if (field.endsWith('_id')) {
-												return ids.includes(doc[field] as number);
-											} else if (Array.isArray(doc[field])) {
-												return ids.some((id: number) => (doc[field] as number[]).includes(id));
-											}
-											return false;
-										});
-									}
-									
-									if (filteredResults.length > 0) {
-										returnData.push(...filteredResults.map((result: IDataObject) => ({ json: result })));
-									}
-								}
-							} catch (e) {
-								// JSON-Parsing fehlgeschlagen
-							}
-							
-							// Filterbeschreibung für Fehlermeldung
-							const filterDescriptions = Object.entries(filterParams)
-								.map(([field, ids]) => `${field} (IDs: ${ids.join(', ')})`)
-								.join(', ');
-							
+						} else {
+							// Fallback für unerwartete Antwortformate
+							console.log('Unerwartetes Antwortformat oder keine Ergebnisse vorhanden');
 							returnData.push({ json: { 
-								message: `Keine Dokumente mit den angegebenen Filtern gefunden: ${filterDescriptions}`,
-								appliedFilters: filterParams
+								message: 'Keine Ergebnisse gefunden oder unerwartetes Antwortformat',
+								requestParams: params,
+								responseInfo: typeof responseData === 'object' ? 
+									{ hasResults: !!responseData?.results, responseType: typeof responseData } :
+									{ responseType: typeof responseData }
 							} });
 						}
 					}
