@@ -16,12 +16,7 @@ import { Readable } from 'stream';
 
 type ValueOf<T> = T[keyof T];
 
-// Interface für Suchergebnisse
-interface ISearchHit {
-	score: number;
-	highlights: string;
-	rank: number;
-}
+// Interface wurde entfernt, da es nicht verwendet wird
 
 export const Resource = {
 	Correspondent: 'correspondent',
