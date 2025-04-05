@@ -18,6 +18,7 @@ export const Resource = {
 	Correspondent: 'correspondent',
 	DocumentType: 'documentType',
 	Document: 'document',
+	Tag: 'tag',
 } as const;
 
 export const Operation = {
@@ -59,6 +60,10 @@ export class PaperlessNgx implements INodeType {
 						name: 'Document',
 						value: Resource.Document,
 					},
+					{
+						name: 'Tag',
+						value: Resource.Tag,
+					},
 				],
 				default: 'document',
 				noDataExpression: true,
@@ -85,6 +90,81 @@ export class PaperlessNgx implements INodeType {
 						value: Operation.Read,
 						description: 'Get documents',
 						action: 'Get documents',
+					},
+				],
+				default: 'read',
+				noDataExpression: true,
+				required: true,
+			},
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				displayOptions: {
+					show: {
+						resource: [Resource.Correspondent],
+					},
+				},
+				options: [
+					{
+						name: 'Create',
+						value: Operation.Create,
+						description: 'Create a correspondent',
+						action: 'Create a correspondent',
+					},
+					{
+						name: 'Read',
+						value: Operation.Read,
+						description: 'Get correspondents',
+						action: 'Get correspondents',
+					},
+				],
+				default: 'read',
+				noDataExpression: true,
+				required: true,
+			},
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				displayOptions: {
+					show: {
+						resource: [Resource.DocumentType],
+					},
+				},
+				options: [
+					{
+						name: 'Read',
+						value: Operation.Read,
+						description: 'Get document types',
+						action: 'Get document types',
+					},
+				],
+				default: 'read',
+				noDataExpression: true,
+				required: true,
+			},
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				displayOptions: {
+					show: {
+						resource: [Resource.Tag],
+					},
+				},
+				options: [
+					{
+						name: 'Create',
+						value: Operation.Create,
+						description: 'Create a tag',
+						action: 'Create a tag',
+					},
+					{
+						name: 'Read',
+						value: Operation.Read,
+						description: 'Get tags',
+						action: 'Get tags',
 					},
 				],
 				default: 'read',
@@ -198,6 +278,78 @@ export class PaperlessNgx implements INodeType {
 						default: '',
 					},
 				],
+			},
+			// Correspondent Create Parameters
+			{
+				displayName: 'Name',
+				name: 'name',
+				type: 'string',
+				required: true,
+				default: '',
+				displayOptions: {
+					show: {
+						resource: [Resource.Correspondent],
+						operation: [Operation.Create],
+					},
+				},
+				description: 'Name of the correspondent',
+			},
+			{
+				displayName: 'Matching Regex',
+				name: 'matchingRegex',
+				type: 'string',
+				required: false,
+				default: '',
+				displayOptions: {
+					show: {
+						resource: [Resource.Correspondent],
+						operation: [Operation.Create],
+					},
+				},
+				description: 'Regular expression to match this correspondent',
+			},
+			// Tag Create Parameters
+			{
+				displayName: 'Name',
+				name: 'name',
+				type: 'string',
+				required: true,
+				default: '',
+				displayOptions: {
+					show: {
+						resource: [Resource.Tag],
+						operation: [Operation.Create],
+					},
+				},
+				description: 'Name of the tag',
+			},
+			{
+				displayName: 'Color',
+				name: 'color',
+				type: 'color',
+				required: false,
+				default: '#a6cee3',
+				displayOptions: {
+					show: {
+						resource: [Resource.Tag],
+						operation: [Operation.Create],
+					},
+				},
+				description: 'Color of the tag',
+			},
+			{
+				displayName: 'Matching Regex',
+				name: 'matchingRegex',
+				type: 'string',
+				required: false,
+				default: '',
+				displayOptions: {
+					show: {
+						resource: [Resource.Tag],
+						operation: [Operation.Create],
+					},
+				},
+				description: 'Regular expression to match this tag',
 			},
 		],
 		credentials: [
@@ -349,6 +501,161 @@ export class PaperlessNgx implements INodeType {
 						returnData.push({ json: { task_id: responseData } });
 					}
 				}
+
+				if (resource === Resource.Correspondent) {
+					if (operation === Operation.Read) {
+						const requestOptions: IRequestOptions = {
+							headers: {
+								Accept: 'application/json',
+							},
+							method: 'GET',
+							uri: `${credentials.domain}/api/correspondents/`,
+							json: true,
+						};
+
+						const paginationOptions: PaginationOptions = {
+							continue: '={{ $response.body["next"] !== null }}',
+							request: {
+								url: '={{ $response.body["next"] }}',
+							},
+							requestInterval: 1,
+						};
+
+						const responseData = await this.helpers.requestWithAuthenticationPaginated.call(
+							this,
+							requestOptions,
+							itemIndex,
+							paginationOptions,
+							'paperlessNgxApi',
+						);
+						const items = responseData.flatMap((response) =>
+							response.body.results.map((result: any) => ({ json: result })),
+						);
+						returnData.push(...items);
+					}
+
+					if (operation === Operation.Create) {
+						const name = this.getNodeParameter('name', itemIndex) as string;
+						const matchingRegex = this.getNodeParameter('matchingRegex', itemIndex, '') as string;
+
+						const requestOptions: IRequestOptions = {
+							method: 'POST',
+							headers: {
+								'Content-Type': 'application/json',
+							},
+							body: {
+								name,
+								...(matchingRegex ? { matching_regex: matchingRegex } : {}),
+							},
+							uri: `${credentials.domain}/api/correspondents/`,
+							json: true,
+						};
+
+						const responseData = await this.helpers.requestWithAuthentication.call(
+							this,
+							'paperlessNgxApi',
+							requestOptions,
+							undefined,
+							itemIndex,
+						);
+						returnData.push({ json: responseData });
+					}
+				}
+
+				if (resource === Resource.DocumentType) {
+					if (operation === Operation.Read) {
+						const requestOptions: IRequestOptions = {
+							headers: {
+								Accept: 'application/json',
+							},
+							method: 'GET',
+							uri: `${credentials.domain}/api/document_types/`,
+							json: true,
+						};
+
+						const paginationOptions: PaginationOptions = {
+							continue: '={{ $response.body["next"] !== null }}',
+							request: {
+								url: '={{ $response.body["next"] }}',
+							},
+							requestInterval: 1,
+						};
+
+						const responseData = await this.helpers.requestWithAuthenticationPaginated.call(
+							this,
+							requestOptions,
+							itemIndex,
+							paginationOptions,
+							'paperlessNgxApi',
+						);
+						const items = responseData.flatMap((response) =>
+							response.body.results.map((result: any) => ({ json: result })),
+						);
+						returnData.push(...items);
+					}
+				}
+
+				if (resource === Resource.Tag) {
+					if (operation === Operation.Read) {
+						const requestOptions: IRequestOptions = {
+							headers: {
+								Accept: 'application/json',
+							},
+							method: 'GET',
+							uri: `${credentials.domain}/api/tags/`,
+							json: true,
+						};
+
+						const paginationOptions: PaginationOptions = {
+							continue: '={{ $response.body["next"] !== null }}',
+							request: {
+								url: '={{ $response.body["next"] }}',
+							},
+							requestInterval: 1,
+						};
+
+						const responseData = await this.helpers.requestWithAuthenticationPaginated.call(
+							this,
+							requestOptions,
+							itemIndex,
+							paginationOptions,
+							'paperlessNgxApi',
+						);
+						const items = responseData.flatMap((response) =>
+							response.body.results.map((result: any) => ({ json: result })),
+						);
+						returnData.push(...items);
+					}
+
+					if (operation === Operation.Create) {
+						const name = this.getNodeParameter('name', itemIndex) as string;
+						const color = this.getNodeParameter('color', itemIndex, '#a6cee3') as string;
+						const matchingRegex = this.getNodeParameter('matchingRegex', itemIndex, '') as string;
+
+						const requestOptions: IRequestOptions = {
+							method: 'POST',
+							headers: {
+								'Content-Type': 'application/json',
+							},
+							body: {
+								name,
+								color,
+								...(matchingRegex ? { matching_regex: matchingRegex } : {}),
+							},
+							uri: `${credentials.domain}/api/tags/`,
+							json: true,
+						};
+
+						const responseData = await this.helpers.requestWithAuthentication.call(
+							this,
+							'paperlessNgxApi',
+							requestOptions,
+							undefined,
+							itemIndex,
+						);
+						returnData.push({ json: responseData });
+					}
+				}
 			} catch (error) {
 				if (this.continueOnFail()) {
 					items.push({ json: this.getInputData(itemIndex)[0].json, error, pairedItem: itemIndex });
@@ -368,3 +675,4 @@ export class PaperlessNgx implements INodeType {
 		return this.prepareOutputData(returnData);
 	}
 }
+
