@@ -14,6 +14,13 @@ import { Readable } from 'stream';
 
 type ValueOf<T> = T[keyof T];
 
+// Interface für Suchergebnisse
+interface ISearchHit {
+	score: number;
+	highlights: string;
+	rank: number;
+}
+
 export const Resource = {
 	Correspondent: 'correspondent',
 	DocumentType: 'documentType',
@@ -26,6 +33,7 @@ export const Operation = {
 	Read: 'read',
 	Update: 'update',
 	Delete: 'delete',
+	List: 'list',
 } as const;
 
 export class PaperlessNgx implements INodeType {
@@ -93,6 +101,12 @@ export class PaperlessNgx implements INodeType {
 						value: Operation.Read,
 						description: 'Get documents',
 						action: 'Get documents',
+					},
+					{
+						name: 'List',
+						value: Operation.List,
+						description: 'List or search documents',
+						action: 'List or search documents',
 					},
 				],
 				default: 'read',
@@ -354,6 +368,105 @@ export class PaperlessNgx implements INodeType {
 				},
 				description: 'Regular expression to match this tag',
 			},
+			{
+				displayName: 'Suchoptionen',
+				name: 'searchOptions',
+				type: 'collection',
+				placeholder: 'Suchfilter hinzufügen',
+				default: {},
+				options: [
+					{
+						displayName: 'Volltextsuche',
+						name: 'query',
+						type: 'string',
+						placeholder: 'z.B. Rechnung 2023',
+						description: 'Volltext-Suchbegriff für Dokumente',
+						default: '',
+					},
+					{
+						displayName: 'Ähnliche Dokumente',
+						name: 'more_like_id',
+						type: 'number',
+						placeholder: '1234',
+						description: 'Dokumente finden, die ähnlich zum Dokument mit dieser ID sind',
+						default: 0,
+					},
+				],
+			},
+			{
+				displayName: 'Filter',
+				name: 'filters',
+				type: 'collection',
+				placeholder: 'Filter hinzufügen',
+				default: {},
+				options: [
+					{
+						displayName: 'Tags',
+						name: 'tags__id__in',
+						type: 'multiOptions',
+						typeOptions: {
+							loadOptionsMethod: 'getTags',
+						},
+						description: 'Nach Tags filtern',
+						default: [],
+					},
+					{
+						displayName: 'Korrespondenten',
+						name: 'correspondent__id__in',
+						type: 'multiOptions',
+						typeOptions: {
+							loadOptionsMethod: 'getCorrespondents',
+						},
+						description: 'Nach Korrespondenten filtern',
+						default: [],
+					},
+					{
+						displayName: 'Dokumenttypen',
+						name: 'document_type__id__in',
+						type: 'multiOptions',
+						typeOptions: {
+							loadOptionsMethod: 'getDocumentTypes',
+						},
+						description: 'Nach Dokumenttypen filtern',
+						default: [],
+					},
+					{
+						displayName: 'Zeitraum von',
+						name: 'created__date__gt',
+						type: 'dateTime',
+						description: 'Datum ab dem Dokumente angezeigt werden sollen',
+						default: '',
+					},
+					{
+						displayName: 'Zeitraum bis',
+						name: 'created__date__lt',
+						type: 'dateTime',
+						description: 'Datum bis zu dem Dokumente angezeigt werden sollen',
+						default: '',
+					},
+				],
+			},
+			{
+				displayName: 'Ergebnislimit',
+				name: 'limit',
+				type: 'number',
+				description: 'Maximale Anzahl der zurückgegebenen Dokumente',
+				default: 25,
+			},
+			{
+				displayName: 'Sortierung',
+				name: 'ordering',
+				type: 'options',
+				options: [
+					{ name: 'Neueste zuerst', value: '-created' },
+					{ name: 'Älteste zuerst', value: 'created' },
+					{ name: 'Titel (A-Z)', value: 'title' },
+					{ name: 'Titel (Z-A)', value: '-title' },
+					{ name: 'Relevanz', value: '' },
+				],
+				default: '-created',
+				description: 'Sortierreihenfolge der Ergebnisse',
+			},
 		],
 		credentials: [
 			{
@@ -502,6 +615,66 @@ export class PaperlessNgx implements INodeType {
 							itemIndex,
 						);
 						returnData.push({ json: { task_id: responseData } });
+					}
+
+					if (operation === Operation.List) {
+						const searchOptions = this.getNodeParameter('searchOptions', itemIndex, {}) as IDataObject;
+						const filters = this.getNodeParameter('filters', itemIndex, {}) as IDataObject;
+						const limit = this.getNodeParameter('limit', itemIndex, 25) as number;
+						const ordering = this.getNodeParameter('ordering', itemIndex, '-created') as string;
+						
+						// Kombiniere alle Parameter
+						let params: IDataObject = {};
+						
+						// Füge Suchparameter hinzu
+						if (searchOptions.query) {
+							params.query = searchOptions.query;
+						}
+						if (searchOptions.more_like_id && Number(searchOptions.more_like_id) > 0) {
+							params.more_like_id = searchOptions.more_like_id;
+						}
+						
+						// Füge Filter hinzu
+						Object.assign(params, filters);
+						
+						// Füge Pagination und Sortierung hinzu
+						params.page_size = limit;
+						if (ordering) {
+							params.ordering = ordering;
+						}
+						
+						// API-Anfrage senden
+						const responseData = await this.helpers.requestWithAuthentication.call(
+							this,
+							'paperlessNgxApi',
+							{
+								method: 'GET',
+								uri: `${credentials.domain}/api/documents/`,
+								qs: params,
+							},
+							undefined,
+							itemIndex,
+						);
+
+						// Bei Suchergebnissen die __search_hit__ Infos verarbeiten
+						if (searchOptions.query || searchOptions.more_like_id) {
+							// Der Schlüssel sollte hier "results" sein, basierend auf der API-Dokumentation
+							if (responseData.results && Array.isArray(responseData.results)) {
+								// Füge für jeden Eintrag einen zusätzlichen "search_info" Schlüssel hinzu
+								responseData.results = responseData.results.map((item: IDataObject) => {
+									if (item.__search_hit__) {
+										const searchHit = item.__search_hit__ as ISearchHit;
+										item.search_score = searchHit.score;
+										item.search_rank = searchHit.rank;
+										item.search_highlights = searchHit.highlights;
+									}
+									return item;
+								});
+							}
+						}
+
+						returnData.push(...responseData.results.map((result: any) => ({ json: result })),
+						);
 					}
 				}
 
