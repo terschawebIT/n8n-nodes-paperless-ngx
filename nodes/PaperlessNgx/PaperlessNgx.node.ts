@@ -765,35 +765,97 @@ export class PaperlessNgx implements INodeType {
 							itemIndex,
 						);
 
-						// Bei Suchergebnissen die __search_hit__ Infos verarbeiten
-						if (searchOptions.query || searchOptions.more_like_id) {
-							// Der Schlüssel sollte hier "results" sein, basierend auf der API-Dokumentation
-							if (responseData.results && Array.isArray(responseData.results)) {
-								// Füge für jeden Eintrag einen zusätzlichen "search_info" Schlüssel hinzu
-								responseData.results = responseData.results.map((item: IDataObject) => {
-									if (item.__search_hit__) {
-										const searchHit = item.__search_hit__ as ISearchHit;
-										item.search_score = searchHit.score;
-										item.search_rank = searchHit.rank;
-										item.search_highlights = searchHit.highlights;
+						// Dynamischen Filter aus den Nutzerparametern lesen
+						const extractFilterParams = (params: IDataObject) => {
+							// Extrahiere alle Filter, die mit "__id__in" enden (für Tags, Korrespondenten, etc.)
+							const idFilters: Record<string, number[]> = {};
+							for (const key in params) {
+								if (key.endsWith('__id__in') && Array.isArray(params[key])) {
+									// Speichere den Basisnamen (z.B. "tags" aus "tags__id__in") und die IDs
+									const baseName = key.replace('__id__in', '');
+									idFilters[baseName] = params[key] as number[];
+								}
+							}
+							return idFilters;
+						};
+
+						const filterParams = extractFilterParams(params); // params aus der Anfrage
+
+						// Wenn ein Filterergebnis mit Ergebnissen zurückkommt
+						if (responseData && responseData.results && Array.isArray(responseData.results)) {
+							let filteredResults = responseData.results;
+							
+							// Für jeden Filter (tags, correspondent, document_type, etc.)
+							for (const [field, ids] of Object.entries(filterParams)) {
+								// Wende den Filter auf die Ergebnisse an
+								filteredResults = filteredResults.filter((doc: IDataObject) => {
+									// Für Felder mit einzelner ID (correspondent_id, document_type_id)
+									if (field.endsWith('_id')) {
+										return ids.includes(doc[field] as number);
 									}
-									return item;
+									// Für Array-Felder wie "tags"
+									else if (Array.isArray(doc[field])) {
+										// Prüfe, ob mindestens eine ID übereinstimmt
+										return ids.some((id: number) => (doc[field] as number[]).includes(id));
+									}
+									return false;
 								});
 							}
-						}
-
-						// Prüfe, ob responseData.results existiert und ein Array ist
-						if (responseData && responseData.results && Array.isArray(responseData.results)) {
-							returnData.push(...responseData.results.map((result: any) => ({ json: result })));
-						} else {
-							// Wenn keine Ergebnisse vorhanden sind, geben wir ein leeres Ergebnis mit Informationen zurück
-							returnData.push({ 
-								json: { 
-									message: 'Keine Ergebnisse gefunden',
-									query: params,
-									rawResponse: responseData 
-								} 
-							});
+							
+							if (filteredResults.length > 0) {
+								returnData.push(...filteredResults.map((result: IDataObject) => ({ json: result })));
+							} else {
+								// Erstelle eine benutzerfreundliche Nachricht mit den verwendeten Filtern
+								const filterDescriptions = Object.entries(filterParams)
+									.map(([field, ids]) => `${field} (IDs: ${ids.join(', ')})`)
+									.join(', ');
+								
+								returnData.push({ json: { 
+									message: `Keine Dokumente mit den angegebenen Filtern gefunden: ${filterDescriptions}`,
+									appliedFilters: filterParams
+								} });
+							}
+						} 
+						// Wenn die API eine Fehlermeldung zurückgibt
+						else if (responseData && responseData.message === "Keine Ergebnisse gefunden" && responseData.rawResponse) {
+							try {
+								// Versuche, die Rohdaten zu parsen
+								const parsedData = typeof responseData.rawResponse === 'string' 
+									? JSON.parse(responseData.rawResponse) 
+									: responseData.rawResponse;
+								
+								if (parsedData.results && Array.isArray(parsedData.results)) {
+									let filteredResults = parsedData.results;
+									
+									// Wende die gleiche Filterlogik an
+									for (const [field, ids] of Object.entries(filterParams)) {
+										filteredResults = filteredResults.filter((doc: IDataObject) => {
+											if (field.endsWith('_id')) {
+												return ids.includes(doc[field] as number);
+											} else if (Array.isArray(doc[field])) {
+												return ids.some((id: number) => (doc[field] as number[]).includes(id));
+											}
+											return false;
+										});
+									}
+									
+									if (filteredResults.length > 0) {
+										returnData.push(...filteredResults.map((result: IDataObject) => ({ json: result })));
+									}
+								}
+							} catch (e) {
+								// JSON-Parsing fehlgeschlagen
+							}
+							
+							// Filterbeschreibung für Fehlermeldung
+							const filterDescriptions = Object.entries(filterParams)
+								.map(([field, ids]) => `${field} (IDs: ${ids.join(', ')})`)
+								.join(', ');
+							
+							returnData.push({ json: { 
+								message: `Keine Dokumente mit den angegebenen Filtern gefunden: ${filterDescriptions}`,
+								appliedFilters: filterParams
+							} });
 						}
 					}
 				}
