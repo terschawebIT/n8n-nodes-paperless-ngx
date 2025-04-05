@@ -44,6 +44,7 @@ export class PaperlessNgx implements INodeType {
 		outputs: ['main'],
 		// Hinweis: Um diese Node als Tool nutzen zu können,
 		// setze die Umgebungsvariable N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE=true
+		usableAsTool: true,
 		properties: [
 			{
 				displayName: 'Resource',
