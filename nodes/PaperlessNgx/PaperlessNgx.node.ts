@@ -5,6 +5,8 @@ import {
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
+	ILoadOptionsFunctions,
+	INodePropertyOptions,
 	IRequestOptions,
 	NodeOperationError,
 	PaginationOptions,
@@ -374,6 +376,12 @@ export class PaperlessNgx implements INodeType {
 				type: 'collection',
 				placeholder: 'Suchfilter hinzufügen',
 				default: {},
+				displayOptions: {
+					show: {
+						resource: [Resource.Document],
+						operation: [Operation.List],
+					},
+				},
 				options: [
 					{
 						displayName: 'Volltextsuche',
@@ -399,6 +407,12 @@ export class PaperlessNgx implements INodeType {
 				type: 'collection',
 				placeholder: 'Filter hinzufügen',
 				default: {},
+				displayOptions: {
+					show: {
+						resource: [Resource.Document],
+						operation: [Operation.List],
+					},
+				},
 				options: [
 					{
 						displayName: 'Tags',
@@ -452,6 +466,12 @@ export class PaperlessNgx implements INodeType {
 				type: 'number',
 				description: 'Maximale Anzahl der zurückgegebenen Dokumente',
 				default: 25,
+				displayOptions: {
+					show: {
+						resource: [Resource.Document],
+						operation: [Operation.List],
+					},
+				},
 			},
 			{
 				displayName: 'Sortierung',
@@ -466,6 +486,12 @@ export class PaperlessNgx implements INodeType {
 				],
 				default: '-created',
 				description: 'Sortierreihenfolge der Ergebnisse',
+				displayOptions: {
+					show: {
+						resource: [Resource.Document],
+						operation: [Operation.List],
+					},
+				},
 			},
 		],
 		credentials: [
@@ -475,6 +501,89 @@ export class PaperlessNgx implements INodeType {
 			},
 		],
 	} as INodeTypeDescription;
+
+	// Methoden zum Laden von Auswahloptionen
+	methods = {
+		loadOptions: {
+			// Lädt alle Tags als Optionen für MultiSelect
+			async getTags(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+				const credentials = await this.getCredentials('paperlessNgxApi');
+				
+				const requestOptions: IRequestOptions = {
+					method: 'GET',
+					uri: `${credentials.domain}/api/tags/`,
+					json: true,
+				};
+				
+				const response = await this.helpers.requestWithAuthentication.call(
+					this,
+					'paperlessNgxApi',
+					requestOptions,
+				);
+				
+				if (!response.results || !Array.isArray(response.results)) {
+					throw new Error('Unerwartetes Antwortformat beim Laden der Tags');
+				}
+				
+				return response.results.map((tag: IDataObject) => ({
+					name: tag.name as string,
+					value: tag.id as number,
+				}));
+			},
+			
+			// Lädt alle Korrespondenten als Optionen für MultiSelect
+			async getCorrespondents(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+				const credentials = await this.getCredentials('paperlessNgxApi');
+				
+				const requestOptions: IRequestOptions = {
+					method: 'GET',
+					uri: `${credentials.domain}/api/correspondents/`,
+					json: true,
+				};
+				
+				const response = await this.helpers.requestWithAuthentication.call(
+					this,
+					'paperlessNgxApi',
+					requestOptions,
+				);
+				
+				if (!response.results || !Array.isArray(response.results)) {
+					throw new Error('Unerwartetes Antwortformat beim Laden der Korrespondenten');
+				}
+				
+				return response.results.map((correspondent: IDataObject) => ({
+					name: correspondent.name as string,
+					value: correspondent.id as number,
+				}));
+			},
+			
+			// Lädt alle Dokumenttypen als Optionen für MultiSelect
+			async getDocumentTypes(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+				const credentials = await this.getCredentials('paperlessNgxApi');
+				
+				const requestOptions: IRequestOptions = {
+					method: 'GET',
+					uri: `${credentials.domain}/api/document_types/`,
+					json: true,
+				};
+				
+				const response = await this.helpers.requestWithAuthentication.call(
+					this,
+					'paperlessNgxApi',
+					requestOptions,
+				);
+				
+				if (!response.results || !Array.isArray(response.results)) {
+					throw new Error('Unerwartetes Antwortformat beim Laden der Dokumenttypen');
+				}
+				
+				return response.results.map((documentType: IDataObject) => ({
+					name: documentType.name as string,
+					value: documentType.id as number,
+				}));
+			},
+		},
+	};
 
 	// The function below is responsible for actually doing whatever this node
 	// is supposed to do. In this case, we're just appending the `myString` property
