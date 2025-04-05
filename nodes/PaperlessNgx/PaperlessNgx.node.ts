@@ -114,6 +114,79 @@ export class PaperlessNgx implements INodeType {
 				displayOptions: {
 					show: {
 						resource: [Resource.Document],
+						operation: [Operation.Create],
+					},
+				},
+				options: [
+					{
+						displayName: 'Title',
+						name: 'title',
+						type: 'string',
+						default: '',
+						description: 'Title of the document',
+					},
+					{
+						displayName: 'Created Date',
+						name: 'created',
+						type: 'dateTime',
+						default: '',
+						description: 'Date when the document was created',
+					},
+					{
+						displayName: 'Correspondent ID',
+						name: 'correspondent',
+						type: 'number',
+						default: 0,
+						description: 'ID of the correspondent to assign to the document',
+					},
+					{
+						displayName: 'Document Type ID',
+						name: 'document_type',
+						type: 'number',
+						default: 0,
+						description: 'ID of the document type to assign to the document',
+					},
+					{
+						displayName: 'Storage Path ID',
+						name: 'storage_path',
+						type: 'number',
+						default: 0,
+						description: 'ID of the storage path to assign to the document',
+					},
+					{
+						displayName: 'Tags IDs',
+						name: 'tags',
+						type: 'string',
+						default: '',
+						description: 'Comma separated list of tag IDs to assign to the document',
+						placeholder: '1,2,3',
+					},
+					{
+						displayName: 'Archive Serial Number',
+						name: 'archive_serial_number',
+						type: 'string',
+						default: '',
+						description: 'Archive serial number to assign to the document',
+					},
+					{
+						displayName: 'Custom Fields IDs',
+						name: 'custom_fields',
+						type: 'string',
+						default: '',
+						description: 'Comma separated list of custom field IDs to assign to the document',
+						placeholder: '1,2,3',
+					},
+				],
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'additionalFields',
+				type: 'collection',
+				placeholder: 'Add Field',
+				default: {},
+				displayOptions: {
+					show: {
+						resource: [Resource.Document],
 						operation: [Operation.Read],
 					},
 				},
@@ -203,17 +276,65 @@ export class PaperlessNgx implements INodeType {
 							documentUploadData = Buffer.from(documentBinaryData.data, BINARY_ENCODING);
 						}
 
-						const requestOptions: IRequestOptions = {
-							method: 'POST',
-							formData: {
-								document: {
-									value: documentUploadData,
-									options: {
-										filename: documentData.fileName,
-										contentType: documentData.mimeType,
-									},
+						const additionalFields = this.getNodeParameter(
+							'additionalFields',
+							itemIndex,
+						) as IDataObject;
+
+						const formData: IDataObject = {
+							document: {
+								value: documentUploadData,
+								options: {
+									filename: documentData.fileName,
+									contentType: documentData.mimeType,
 								},
 							},
+						};
+
+						// Add additional fields to formData
+						if (additionalFields.title) {
+							formData.title = additionalFields.title as string;
+						}
+						if (additionalFields.created) {
+							formData.created = additionalFields.created as string;
+						}
+						if (additionalFields.correspondent) {
+							formData.correspondent = additionalFields.correspondent as number;
+						}
+						if (additionalFields.document_type) {
+							formData.document_type = additionalFields.document_type as number;
+						}
+						if (additionalFields.storage_path) {
+							formData.storage_path = additionalFields.storage_path as number;
+						}
+						if (additionalFields.archive_serial_number) {
+							formData.archive_serial_number = additionalFields.archive_serial_number as string;
+						}
+
+						// Handle tags as array
+						if (additionalFields.tags) {
+							const tagsString = additionalFields.tags as string;
+							const tagsArray = tagsString.split(',').map(tag => tag.trim());
+							
+							// Add each tag as a separate form field with the same name
+							tagsArray.forEach(tagId => {
+								if (!formData.tags) {
+									formData.tags = [];
+								}
+								(formData.tags as number[]).push(parseInt(tagId, 10));
+							});
+						}
+
+						// Handle custom fields as array
+						if (additionalFields.custom_fields) {
+							const customFieldsString = additionalFields.custom_fields as string;
+							const customFieldsArray = customFieldsString.split(',').map(field => field.trim());
+							formData.custom_fields = customFieldsArray.map(fieldId => parseInt(fieldId, 10));
+						}
+
+						const requestOptions: IRequestOptions = {
+							method: 'POST',
+							formData,
 							uri: `${credentials.domain}/api/documents/post_document/`,
 							json: true,
 						};
