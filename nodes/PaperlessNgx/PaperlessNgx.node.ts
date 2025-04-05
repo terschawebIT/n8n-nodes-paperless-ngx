@@ -782,8 +782,19 @@ export class PaperlessNgx implements INodeType {
 							}
 						}
 
-						returnData.push(...responseData.results.map((result: any) => ({ json: result })),
-						);
+						// Prüfe, ob responseData.results existiert und ein Array ist
+						if (responseData && responseData.results && Array.isArray(responseData.results)) {
+							returnData.push(...responseData.results.map((result: any) => ({ json: result })));
+						} else {
+							// Wenn keine Ergebnisse vorhanden sind, geben wir ein leeres Ergebnis mit Informationen zurück
+							returnData.push({ 
+								json: { 
+									message: 'Keine Ergebnisse gefunden',
+									query: params,
+									rawResponse: responseData 
+								} 
+							});
+						}
 					}
 				}
 
