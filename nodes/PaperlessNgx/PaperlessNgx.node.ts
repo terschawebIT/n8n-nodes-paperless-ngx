@@ -747,23 +747,42 @@ export class PaperlessNgx implements INodeType {
 							params.ordering = ordering;
 						}
 						
+						console.log('API-Anfrage Parameter:', JSON.stringify(params));
+						
+						// Format der tags__id__in Parameter korrigieren - die API erwartet einen kommagetrennten String
+						for (const key in params) {
+							// Für Parameter, die mit "__id__in" enden und Array-Werte haben (tags, correspondent, etc.)
+							if (key.endsWith('__id__in') && Array.isArray(params[key])) {
+								// Arrays in kommagetrennten String umwandeln
+								params[key] = (params[key] as number[]).join(',');
+							}
+						}
+						
+						console.log('Korrigierte API-Parameter:', JSON.stringify(params));
+						
 						// Dynamischen Filter aus den Nutzerparametern lesen
 						const extractFilterParams = (params: IDataObject) => {
 							// Extrahiere alle Filter, die mit "__id__in" enden (für Tags, Korrespondenten, etc.)
 							const idFilters: Record<string, number[]> = {};
 							for (const key in params) {
-								if (key.endsWith('__id__in') && Array.isArray(params[key])) {
+								if (key.endsWith('__id__in')) {
 									// Speichere den Basisnamen (z.B. "tags" aus "tags__id__in") und die IDs
 									const baseName = key.replace('__id__in', '');
-									idFilters[baseName] = params[key] as number[];
+									
+									// Konvertiere String zurück zu Array, falls nötig
+									const idValues = typeof params[key] === 'string' 
+										? params[key].split(',').map(id => parseInt(id.trim(), 10))
+										: Array.isArray(params[key]) 
+											? params[key] as number[]
+											: [params[key] as number];
+									
+									idFilters[baseName] = idValues;
 								}
 							}
 							return idFilters;
 						};
 
 						const filterParams = extractFilterParams(params); // params aus der Anfrage
-						
-						console.log('API-Anfrage Parameter:', JSON.stringify(params));
 						
 						// API-Anfrage senden
 						const responseData = await this.helpers.requestWithAuthentication.call(
