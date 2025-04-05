@@ -42,7 +42,8 @@ export class PaperlessNgx implements INodeType {
 		},
 		inputs: ['main'],
 		outputs: ['main'],
-		usableAsTool: true,
+		// Hinweis: Um diese Node als Tool nutzen zu können,
+		// setze die Umgebungsvariable N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE=true
 		properties: [
 			{
 				displayName: 'Resource',
@@ -359,7 +360,7 @@ export class PaperlessNgx implements INodeType {
 				required: true,
 			},
 		],
-	};
+	} as INodeTypeDescription;
 
 	// The function below is responsible for actually doing whatever this node
 	// is supposed to do. In this case, we're just appending the `myString` property
