@@ -42,6 +42,7 @@ export class PaperlessNgx implements INodeType {
 		},
 		inputs: ['main'],
 		outputs: ['main'],
+		usableAsTool: true,
 		properties: [
 			{
 				displayName: 'Resource',
