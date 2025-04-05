@@ -105,6 +105,12 @@ export class PaperlessNgx implements INodeType {
 						description: 'List or search documents',
 						action: 'List or search documents',
 					},
+					{
+						name: 'Update',
+						value: Operation.Update,
+						description: 'Update a document',
+						action: 'Update a document',
+					},
 				],
 				default: 'read',
 				noDataExpression: true,
@@ -488,6 +494,95 @@ export class PaperlessNgx implements INodeType {
 					},
 				},
 			},
+			// Neue Parameter für die Update-Operation hinzufügen
+			{
+				displayName: 'Document ID',
+				name: 'id',
+				type: 'number',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: [Resource.Document],
+						operation: [Operation.Update],
+					},
+				},
+				default: 0,
+				description: 'ID des zu aktualisierenden Dokuments',
+			},
+			{
+				displayName: 'Update Fields',
+				name: 'updateFields',
+				type: 'collection',
+				placeholder: 'Felder aktualisieren',
+				default: {},
+				displayOptions: {
+					show: {
+						resource: [Resource.Document],
+						operation: [Operation.Update],
+					},
+				},
+				options: [
+					{
+						displayName: 'Title',
+						name: 'title',
+						type: 'string',
+						default: '',
+						description: 'Neuer Titel des Dokuments',
+					},
+					{
+						displayName: 'Created Date',
+						name: 'created',
+						type: 'dateTime',
+						default: '',
+						description: 'Neues Erstellungsdatum des Dokuments',
+					},
+					{
+						displayName: 'Correspondent ID',
+						name: 'correspondent',
+						type: 'number',
+						default: 0,
+						description: 'ID des Korrespondenten',
+					},
+					{
+						displayName: 'Document Type ID',
+						name: 'document_type',
+						type: 'number',
+						default: 0,
+						description: 'ID des Dokumenttyps',
+					},
+					{
+						displayName: 'Storage Path ID',
+						name: 'storage_path',
+						type: 'number',
+						default: 0,
+						description: 'ID des Speicherpfads',
+					},
+					{
+						displayName: 'Tags IDs',
+						name: 'tags',
+						type: 'multiOptions',
+						typeOptions: {
+							loadOptionsMethod: 'getTags',
+						},
+						default: [],
+						description: 'IDs der zuzuweisenden Tags',
+					},
+					{
+						displayName: 'Archive Serial Number',
+						name: 'archive_serial_number',
+						type: 'string',
+						default: '',
+						description: 'Archivierungsnummer',
+					},
+					{
+						displayName: 'Custom Fields',
+						name: 'custom_fields',
+						type: 'json',
+						default: '{}',
+						description: 'Benutzerdefinierte Felder im JSON-Format, z.B. {"field_id": "value"}',
+					},
+				],
+			},
 		],
 		credentials: [
 			{
@@ -832,6 +927,70 @@ export class PaperlessNgx implements INodeType {
 									{ hasResults: !!responseData?.results, responseType: typeof responseData } :
 									{ responseType: typeof responseData }
 							} });
+						}
+					}
+
+					if (operation === Operation.Update) {
+						const id = this.getNodeParameter('id', itemIndex) as number;
+						const updateFields = this.getNodeParameter('updateFields', itemIndex, {}) as IDataObject;
+						
+						// Bereite Updateparameter vor
+						const body: IDataObject = {};
+						
+						// Übertrage alle Felder, die aktualisiert werden sollen
+						for (const key of Object.keys(updateFields)) {
+							// Spezialbehandlung für Tags
+							if (key === 'tags' && Array.isArray(updateFields.tags)) {
+								body[key] = updateFields[key];
+							} 
+							// Spezialbehandlung für Custom Fields
+							else if (key === 'custom_fields' && typeof updateFields.custom_fields === 'string') {
+								try {
+									body[key] = JSON.parse(updateFields.custom_fields as string);
+								} catch (e) {
+									throw new NodeOperationError(
+										this.getNode(),
+										`Custom Fields müssen ein gültiges JSON-Format haben: ${e}`,
+										{ itemIndex },
+									);
+								}
+							}
+							// Standardbehandlung für alle anderen Felder
+							else if (updateFields[key] !== undefined && updateFields[key] !== null) {
+								body[key] = updateFields[key];
+							}
+						}
+						
+						console.log(`Aktualisiere Dokument ${id} mit Daten:`, JSON.stringify(body));
+						
+						const requestOptions: IRequestOptions = {
+							method: 'PATCH',
+							headers: {
+								'Content-Type': 'application/json',
+							},
+							body,
+							uri: `${credentials.domain}/api/documents/${id}/`,
+							json: true,
+						};
+						
+						try {
+							const responseData = await this.helpers.requestWithAuthentication.call(
+								this,
+								'paperlessNgxApi',
+								requestOptions,
+								undefined,
+								itemIndex,
+							);
+							
+							console.log(`Dokument ${id} erfolgreich aktualisiert`);
+							returnData.push({ json: responseData });
+						} catch (error) {
+							console.error(`Fehler beim Aktualisieren von Dokument ${id}:`, error);
+							throw new NodeOperationError(
+								this.getNode(),
+								`Fehler beim Aktualisieren des Dokuments: ${error.message}`,
+								{ itemIndex },
+							);
 						}
 					}
 				}
