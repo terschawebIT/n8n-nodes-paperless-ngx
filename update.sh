@@ -26,17 +26,37 @@ git pull origin master
 echo "🧹 Cleaning old build artifacts..."
 rm -rf dist node_modules package-lock.json
 
-# Lösche den npm-Cache
-echo "🗑️ Clearing npm cache..."
-npm cache clean --force
+# Stelle sicher, dass pnpm verfügbar ist
+echo "🧰 Ensuring pnpm is available..."
+if command -v pnpm >/dev/null 2>&1; then
+    PNPM_CMD="pnpm"
+else
+    if command -v corepack >/dev/null 2>&1; then
+        echo "🧩 Activating pnpm via corepack..."
+        corepack enable >/dev/null 2>&1 || true
+        corepack prepare pnpm@10.17.0 --activate >/dev/null 2>&1 || true
+        PNPM_CMD="pnpm"
+    else
+        echo "⬇️ Installing pnpm globally via npm..."
+        npm i -g pnpm >/dev/null 2>&1 || {
+            echo "❌ Could not install pnpm. Please install pnpm and re-run."
+            exit 1
+        }
+        PNPM_CMD="pnpm"
+    fi
+fi
 
-# Installiere Dependencies neu
-echo "📦 Installing dependencies..."
-npm install --legacy-peer-deps
+# PNPM-Store bereinigen (optional)
+echo "🗑️ Pruning pnpm store..."
+$PNPM_CMD store prune || true
+
+# Installiere Dependencies neu (pnpm)
+echo "📦 Installing dependencies (pnpm)..."
+$PNPM_CMD install --frozen-lockfile=false
 
 # Baue das Plugin
-echo "🔨 Building plugin..."
-npm run build
+echo "🔨 Building plugin (pnpm)..."
+$PNPM_CMD run build
 
 # Prüfe ob Build erfolgreich war
 if [ $? -eq 0 ]; then

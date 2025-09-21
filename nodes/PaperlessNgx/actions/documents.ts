@@ -129,7 +129,7 @@ export async function executeDocuments(this: IExecuteFunctions, items: any[], it
 			uri: `${credentials.domain}/api/documents/${id}/download/`,
 			json: false,
 			encoding: null,
-			headers: { Accept: 'application/octet-stream' },
+			headers: { Accept: '*/*' },
 		};
 		const data = (await this.helpers.requestWithAuthentication.call(this, 'paperlessNgxApi', requestOptions, undefined, itemIndex)) as Buffer;
 		const newItem = { json: {}, binary: {} as any };
