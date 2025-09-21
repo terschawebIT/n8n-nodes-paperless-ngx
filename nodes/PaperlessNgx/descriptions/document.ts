@@ -127,4 +127,25 @@ export const documentUpdateProperties: INodeTypeDescription['properties'] = [
 	},
 ];
 
+export const documentDownloadProperties: INodeTypeDescription['properties'] = [
+	{
+		displayName: 'Document ID',
+		name: 'id',
+		type: 'number',
+		required: true,
+		displayOptions: { show: { resource: [Resource.Document], operation: [Operation.Download] } },
+		default: 0,
+		description: 'ID des herunterzuladenden Dokuments',
+	},
+	{
+		displayName: 'Binary Property',
+		name: 'binaryPropertyName',
+		type: 'string',
+		required: true,
+		displayOptions: { show: { resource: [Resource.Document], operation: [Operation.Download] } },
+		default: 'data',
+		description: 'Name des binären Outputs',
+	},
+];
+
 

@@ -120,4 +120,20 @@ export async function executeDocuments(this: IExecuteFunctions, items: any[], it
 		const responseData = await this.helpers.requestWithAuthentication.call(this, 'paperlessNgxApi', requestOptions, undefined, itemIndex);
 		returnData.push({ json: responseData });
 	}
+
+	if (operation === 'download') {
+		const id = this.getNodeParameter('id', itemIndex) as number;
+		const binaryPropertyName = this.getNodeParameter('binaryPropertyName', itemIndex) as string;
+		const requestOptions: IRequestOptions = {
+			method: 'GET',
+			uri: `${credentials.domain}/api/documents/${id}/download/`,
+			json: false,
+			encoding: null,
+			headers: { Accept: 'application/octet-stream' },
+		};
+		const data = (await this.helpers.requestWithAuthentication.call(this, 'paperlessNgxApi', requestOptions, undefined, itemIndex)) as Buffer;
+		const newItem = { json: {}, binary: {} as any };
+		newItem.binary[binaryPropertyName] = await this.helpers.prepareBinaryData(data, `document_${id}.pdf`);
+		returnData.push(newItem as any);
+	}
 }

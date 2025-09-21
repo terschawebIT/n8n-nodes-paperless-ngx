@@ -13,6 +13,7 @@ export const Operation = {
 	Update: 'update',
 	Delete: 'delete',
 	List: 'list',
+	Download: 'download',
 } as const;
 
 

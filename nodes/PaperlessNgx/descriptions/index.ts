@@ -1,6 +1,6 @@
 import { INodeTypeDescription } from 'n8n-workflow';
 import { Resource, Operation } from '../shared/constants';
-import { documentCreateProperties, documentReadProperties, documentListProperties, documentUpdateProperties } from './document';
+import { documentCreateProperties, documentReadProperties, documentListProperties, documentUpdateProperties, documentDownloadProperties } from './document';
 import { correspondentProperties } from './correspondent';
 import { tagProperties } from './tag';
 
@@ -29,6 +29,7 @@ export const nodeProperties: INodeTypeDescription['properties'] = [
 			{ name: 'Read', value: Operation.Read, description: 'Get documents', action: 'Get documents' },
 			{ name: 'List', value: Operation.List, description: 'List or search documents', action: 'List or search documents' },
 			{ name: 'Update', value: Operation.Update, description: 'Update a document', action: 'Update a document' },
+			{ name: 'Download', value: Operation.Download, description: 'Download a document', action: 'Download a document' },
 		],
 		default: 'read',
 		noDataExpression: true,
@@ -76,6 +77,7 @@ export const nodeProperties: INodeTypeDescription['properties'] = [
 	...documentReadProperties,
 	...documentListProperties,
 	...documentUpdateProperties,
+	...documentDownloadProperties,
 	...correspondentProperties,
 	...tagProperties,
 ];
